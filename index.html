@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ứng dụng truyền file RSA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.12.0/toastify.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.12.0/toastify.min.css">
+    <style>
+        .toastify { z-index: 50; }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-3xl bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+        <h1 class="text-2xl font-bold text-center mb-6">Ứng dụng truyền file với RSA & Chữ ký số</h1>
+
+        <!-- Key Generation Section -->
+        <div id="keySection" class="space-y-4 mb-6">
+            <h2 class="text-lg font-semibold">Tạo cặp khóa RSA</h2>
+            <div>
+                <label class="block text-sm font-medium">Chọn kích thước khóa:</label>
+                <select id="keySize" class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+                    <option value="2048">2048 bits</option>
+                    <option value="4096">4096 bits</option>
+                </select>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Khóa lớn hơn bảo mật hơn nhưng chậm hơn.</p>
+            </div>
+            <button id="generateKeyBtn" class="w-full bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition">Tạo cặp khóa</button>
+            <div id="keyOutput" class="hidden space-y-2">
+                <div>
+                    <label class="block text-sm font-medium">Khóa công khai (PEM):</label>
+                    <textarea id="publicKey" readonly class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-24"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Khóa riêng tư (PEM):</label>
+                    <textarea id="privateKey" readonly class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-24"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Section -->
+        <div id="loginSection" class="space-y-4 mb-6">
+            <h2 class="text-lg font-semibold">Đăng nhập</h2>
+            <div>
+                <label for="username" class="block text-sm font-medium">Username:</label>
+                <input type="text" id="username" class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nhập username">
+            </div>
+            <button id="loginBtn" class="w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition">Đăng nhập</button>
+        </div>
+
+        <!-- File Transfer Section -->
+        <div id="fileSection" class="space-y-4 mb-6 hidden">
+            <h2 class="text-lg font-semibold">Truyền file</h2>
+            <div>
+                <label for="receiver" class="block text-sm font-medium">Username người nhận:</label>
+                <input type="text" id="receiver" class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nhập username người nhận">
+            </div>
+            <div>
+                <label for="fileInput" class="block text-sm font-medium">Chọn file để gửi:</label>
+                <input type="file" id="fileInput" class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+            </div>
+            <button id="sendBtn" class="w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition flex items-center justify-center">
+                <span>Gửi file</span>
+                <div id="sendSpinner" class="spinner ml-2"></div>
+            </button>
+        </div>
+
+        <!-- Local Sign & Encrypt Section -->
+        <div id="localSignSection" class="space-y-4 mb-6">
+            <h2 class="text-lg font-semibold">Ký & Mã hóa cục bộ</h2>
+            <div>
+                <label for="localFileInput" class="block text-sm font-medium">Chọn file:</label>
+                <input type="file" id="localFileInput" class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+            </div>
+            <button id="signEncryptBtn" class="w-full bg-purple-500 text-white p-2 rounded-md hover:bg-purple-600 transition">Ký & Mã hóa</button>
+            <div id="encryptedOutput" class="hidden">
+                <label class="block text-sm font-medium">Dữ liệu mã hóa & ký (Base64):</label>
+                <textarea id="encryptedData" readonly class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-24"></textarea>
+            </div>
+        </div>
+
+        <!-- Local Decrypt & Verify Section -->
+        <div id="localDecryptSection" class="space-y-4 mb-6">
+            <h2 class="text-lg font-semibold">Giải mã & Xác minh cục bộ</h2>
+            <div>
+                <label for="encryptedInput" class="block text-sm font-medium">Dán dữ liệu mã hóa & ký (Base64):</label>
+                <textarea id="encryptedInput" class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-24" placeholder="Dán dữ liệu Base64"></textarea>
+            </div>
+            <button id="decryptVerifyBtn" class="w-full bg-purple-500 text-white p-2 rounded-md hover:bg-purple-600 transition">Giải mã & Xác minh</button>
+            <div id="decryptedOutput" class="hidden">
+                <label class="block text-sm font-medium">Nội dung giải mã:</label>
+                <textarea id="decryptedData" readonly class="mt-1 w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-24"></textarea>
+            </div>
+        </div>
+
+        <!-- Received Files Section -->
+        <div class="mt-6">
+            <p id="status" class="text-sm text-gray-600 dark:text-gray-300"></p>
+            <h2 class="text-lg font-semibold mt-4">File đã nhận:</h2>
+            <div id="receivedFiles" class="mt-2 space-y-4"></div>
+        </div>
+    </div>
+
+    <script src="client.js"></script>
+</body>
+</html>
